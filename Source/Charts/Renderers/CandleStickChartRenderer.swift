@@ -68,7 +68,14 @@ open class CandleStickChartRenderer: LineScatterCandleRadarRenderer
         context.saveGState()
         
         context.setLineWidth(dataSet.shadowWidth)
-
+        // 初始化声明可见区域的最小最大值
+        var minValue: Double = Double.greatestFiniteMagnitude
+        var maxValue: Double = -Double.greatestFiniteMagnitude
+        
+        // 初始化声明可见区域的最小最大值对应的X坐标点
+        var minPositionX: Double!
+        var maxPositionX: Double!
+        
         for j in _xBounds
         {
             // get the entry
@@ -88,7 +95,16 @@ open class CandleStickChartRenderer: LineScatterCandleRadarRenderer
                                            width: (2 * barSpace) - 1.0,
                                            height: (CGFloat(abs(high - low) * phaseY)))
             trans.rectValueToPixel(&accessibilityRect)
-
+            //写入最小的Y值的位置和数值
+            if minValue > low {
+                minValue = low
+                minPositionX = xPos
+            }
+            //写入最大的Y值的位置和数值
+            if maxValue < high {
+                maxValue = high
+                maxPositionX = xPos
+            }
             if showCandleBar
             {
                 // calculate the shadow
@@ -262,7 +278,67 @@ open class CandleStickChartRenderer: LineScatterCandleRadarRenderer
         // Post this notification to let VoiceOver account for the redrawn frames
         accessibilityPostLayoutChangedNotification()
 
+        // 可见区域最左界的箭头数据
+        guard let lowestVisbleEntry = dataSet.entryForIndex(_xBounds.min) as? CandleChartDataEntry else {
+            return
+        }
+        var lowestVisblePoint: CGPoint = CGPoint.init(x: lowestVisbleEntry.x, y: lowestVisbleEntry.low) // 此处主要是为了获取X坐标，lowestVisbleEntry.low可为high、open、close
+        trans.pointValueToPixel(&lowestVisblePoint)
+        
+        // 可见区域最右界的箭头数据
+        guard let highestVisbleEntry = dataSet.entryForIndex( _xBounds.range + _xBounds.min) as? CandleChartDataEntry else {
+            return
+        }
+        var highestVisblePoint: CGPoint = CGPoint.init(x: highestVisbleEntry.x, y: highestVisbleEntry.high)
+        trans.pointValueToPixel(&highestVisblePoint)
+        
+        // 可见区域中的最小值
+        let minValueStr = String.init(format: "%.4f", minValue)
+        var minPoint: CGPoint = CGPoint.init(x: CGFloat(minPositionX), y: CGFloat(minValue * animator.phaseY))
+        // 点转化为像素
+        trans.pointValueToPixel(&minPoint)
+        calculateTextPosition(minValueStr, originPoint: &minPoint, lowestVisibleX: lowestVisblePoint.x, highestVisibleX: highestVisblePoint.x, isMaxValue: false)
+        
+        // 可见区域中的最大值
+        let maxValueStr = String.init(format: "%.4f", maxValue)
+        var maxPoint: CGPoint = CGPoint.init(x: CGFloat(maxPositionX), y: CGFloat(maxValue * animator.phaseY))
+        trans.pointValueToPixel(&maxPoint)
+        calculateTextPosition(maxValueStr, originPoint: &maxPoint, lowestVisibleX: lowestVisblePoint.x, highestVisibleX: highestVisblePoint.x, isMaxValue: true)
+        
         context.restoreGState()
+    }
+    
+    // 计算绘制位置并绘制文本，注意坐标值(相对于图标)转像素值(相对于手机屏幕)
+    fileprivate func calculateTextPosition(_ valueText: String, originPoint: inout CGPoint, lowestVisibleX: CGFloat, highestVisibleX: CGFloat, isMaxValue: Bool){
+        let attributes: [NSAttributedString.Key : Any] = [NSAttributedString.Key.font: UIFont.init(name: "Helvetica", size: 12) ?? UIColor.black, NSAttributedString.Key.foregroundColor: UIColor(red: 51/255.0, green: 51/255.0, blue: 51/255.0, alpha: 1.0)]
+        
+        let stringText = NSString.init(string: "←\(valueText)")
+        
+        let textWidth = stringText.boundingRect(with: CGSize.init(width: 0, height: 12), options: .usesLineFragmentOrigin, attributes: attributes, context: nil).width + 2
+        var resultText: NSString?
+        
+        if isMaxValue {
+            originPoint.y -= 8
+        } else {
+            originPoint.y -= 9
+        }
+        if originPoint.x - 10 < lowestVisibleX {
+            originPoint.x += 3
+            resultText = NSString(string: "<---" + valueText)
+        }
+        else if originPoint.x - textWidth - 10 < lowestVisibleX {
+            originPoint.x += 3
+            resultText = NSString(string: "<---" + valueText)
+        }s
+        else if ((originPoint.x + textWidth + 10 >= highestVisibleX) && (highestVisibleX - lowestVisibleX >= textWidth + 3)) {
+            resultText = NSString(string: valueText + "--->")
+            originPoint.x -= (textWidth + 2)
+        }
+        else {
+            originPoint.x += 3
+            resultText = NSString(string: "<---" + valueText)
+        }
+        resultText?.draw(at: originPoint, withAttributes: attributes)
     }
     
     open override func drawValues(context: CGContext)
