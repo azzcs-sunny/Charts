@@ -329,7 +329,7 @@ open class CandleStickChartRenderer: LineScatterCandleRadarRenderer
         else if originPoint.x - textWidth - 10 < lowestVisibleX {
             originPoint.x += 3
             resultText = NSString(string: "<---" + valueText)
-        }s
+        }
         else if ((originPoint.x + textWidth + 10 >= highestVisibleX) && (highestVisibleX - lowestVisibleX >= textWidth + 3)) {
             resultText = NSString(string: valueText + "--->")
             originPoint.x -= (textWidth + 2)
