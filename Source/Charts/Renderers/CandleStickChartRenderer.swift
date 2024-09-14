@@ -16,7 +16,11 @@ open class CandleStickChartRenderer: LineScatterCandleRadarRenderer
 {
     @objc open weak var dataProvider: CandleChartDataProvider?
     
-    @objc open var textColor: UIColor = UIColor.black
+    @objc open var textMaxColor: UIColor = UIColor.black
+    
+    @objc open var textMinColor: UIColor = UIColor.black
+    
+    @objc open var precision: Int = 2
     
     @objc public init(dataProvider: CandleChartDataProvider, animator: Animator, viewPortHandler: ViewPortHandler)
     {
@@ -295,15 +299,15 @@ open class CandleStickChartRenderer: LineScatterCandleRadarRenderer
         trans.pointValueToPixel(&highestVisblePoint)
         
         // 可见区域中的最小值
-        let minValueStr = String.init(format: "%.4f", minValue)
-        var minPoint: CGPoint = CGPoint.init(x: CGFloat(minPositionX), y: CGFloat(minValue * animator.phaseY))
+        let minValueStr = self.decimal(num: minValue, scale: self.precision);
+        var minPoint: CGPoint = CGPoint(x: CGFloat(minPositionX), y: CGFloat(minValue * animator.phaseY))
         // 点转化为像素
         trans.pointValueToPixel(&minPoint)
         calculateTextPosition(minValueStr, originPoint: &minPoint, lowestVisibleX: lowestVisblePoint.x, highestVisibleX: highestVisblePoint.x, isMaxValue: false)
         
         // 可见区域中的最大值
-        let maxValueStr = String.init(format: "%.4f", maxValue)
-        var maxPoint: CGPoint = CGPoint.init(x: CGFloat(maxPositionX), y: CGFloat(maxValue * animator.phaseY))
+        let maxValueStr = self.decimal(num: maxValue, scale: self.precision);
+        var maxPoint: CGPoint = CGPoint(x: CGFloat(maxPositionX), y: CGFloat(maxValue * animator.phaseY))
         trans.pointValueToPixel(&maxPoint)
         calculateTextPosition(maxValueStr, originPoint: &maxPoint, lowestVisibleX: lowestVisblePoint.x, highestVisibleX: highestVisblePoint.x, isMaxValue: true)
         
@@ -312,9 +316,9 @@ open class CandleStickChartRenderer: LineScatterCandleRadarRenderer
     
     // 计算绘制位置并绘制文本，注意坐标值(相对于图标)转像素值(相对于手机屏幕)
     fileprivate func calculateTextPosition(_ valueText: String, originPoint: inout CGPoint, lowestVisibleX: CGFloat, highestVisibleX: CGFloat, isMaxValue: Bool){
-        let attributes: [NSAttributedString.Key : Any] = [NSAttributedString.Key.font: UIFont.init(name: "Helvetica", size: 12) ?? UIColor.black, NSAttributedString.Key.foregroundColor: self.textColor]
+        let attributes: [NSAttributedString.Key : Any] = [NSAttributedString.Key.font: UIFont.init(name: "Helvetica", size: 12) ?? UIColor.black, NSAttributedString.Key.foregroundColor: isMaxValue ? self.textMaxColor : self.textMinColor]
         
-        let stringText = NSString.init(string: "←\(valueText)")
+        let stringText = NSString.init(string: "<---\(valueText)")
         
         let textWidth = stringText.boundingRect(with: CGSize.init(width: 0, height: 12), options: .usesLineFragmentOrigin, attributes: attributes, context: nil).width + 2
         var resultText: NSString?
@@ -326,21 +330,33 @@ open class CandleStickChartRenderer: LineScatterCandleRadarRenderer
         }
         if originPoint.x - 10 < lowestVisibleX {
             originPoint.x += 3
-            resultText = NSString(string: "<---" + valueText)
+            resultText = NSString(string: "--->" + valueText)
         }
         else if originPoint.x - textWidth - 10 < lowestVisibleX {
             originPoint.x += 3
-            resultText = NSString(string: "<---" + valueText)
+            resultText = NSString(string: "--->" + valueText)
         }
         else if ((originPoint.x + textWidth + 10 >= highestVisibleX) && (highestVisibleX - lowestVisibleX >= textWidth + 3)) {
-            resultText = NSString(string: valueText + "--->")
+            resultText = NSString(string: valueText + "<---")
             originPoint.x -= (textWidth + 2)
         }
         else {
             originPoint.x += 3
-            resultText = NSString(string: "<---" + valueText)
+            resultText = NSString(string: "--->" + valueText)
         }
         resultText?.draw(at: originPoint, withAttributes: attributes)
+    }
+    
+    fileprivate func decimal(num: Double, scale: Int) -> String {
+        let formatter = NumberFormatter();
+        formatter.locale = Locale(identifier: "zh_CN");
+        formatter.minimumIntegerDigits = 1;
+        formatter.maximumFractionDigits = scale;
+        formatter.minimumFractionDigits = scale;
+        var num = NSDecimalNumber(decimal: NSNumber(value: num).decimalValue);
+        let handler = NSDecimalNumberHandler(roundingMode: .plain, scale: Int16(scale), raiseOnExactness: false, raiseOnOverflow: false, raiseOnUnderflow: false, raiseOnDivideByZero: true);
+        let s = num.rounding(accordingToBehavior: handler);
+        return formatter.string(from: s) ?? "";
     }
     
     open override func drawValues(context: CGContext)
